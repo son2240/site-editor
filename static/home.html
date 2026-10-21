@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사이트 편집기</title>
+<script src="/static/i18n.js"></script>
+<link rel="icon" href="/static/app.png">
+<style>
+  :root {
+    --bg: #f4f6f9; --panel: #ffffff; --fg: #16181d; --muted: #5b6270; --border: #e1e4ea;
+    --accent: #2f6fed; --accent-soft: #e8f0fd; --ok: #1a7f37; --bad: #c62828; --bad-soft: #fdecea; --radius: 12px;
+    color-scheme: light; font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --panel: #171a21; --fg: #e8eaee; --muted: #9aa2b1; --border: #2a2f39; --accent: #6ea8ff;
+      --accent-soft: #17243a; --ok: #4ac26b; --bad: #ff7b72; --bad-soft: #2d1414; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-size: 14px; min-height: 100vh; }
+  button, input { font: inherit; color: inherit; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 10px 22px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  header img { width: 30px; height: 30px; }
+  header h1 { font-size: 17px; margin: 0; white-space: nowrap; }
+  .search { flex: 1; max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 8px; background: var(--bg); border-radius: 999px; padding: 0 16px; height: 42px; border: 1px solid transparent; }
+  .search:focus-within { border-color: var(--accent); background: var(--panel); }
+  .search input { flex: 1; border: 0; background: none; outline: none; font-size: 15px; }
+  .btn { height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; font-weight: 600; white-space: nowrap; }
+  .btn:hover { background: var(--bg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { color: var(--bad); }
+  .icon-btn { width: 38px; height: 38px; border-radius: 50%; border: 0; background: none; cursor: pointer; font-size: 18px; }
+  .icon-btn:hover { background: var(--bg); }
+  .start { background: var(--panel); border-bottom: 1px solid var(--border); padding: 18px 22px 22px; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .start h2, .recent h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+  .tiles { display: flex; gap: 16px; flex-wrap: wrap; }
+  .tile { width: 168px; cursor: pointer; border: 0; background: none; padding: 0; text-align: left; }
+  .tile .face { height: 120px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); display: flex; align-items: center; justify-content: center; font-size: 40px; transition: border-color .15s; }
+  .tile:hover .face { border-color: var(--accent); }
+  .tile .t { font-weight: 600; margin-top: 8px; }
+  .tile .s { color: var(--muted); font-size: 12px; }
+  .recent { padding: 22px; }
+  .recent .bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .recent .bar h2 { margin: 0; margin-right: auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; display: flex; flex-direction: column; transition: border-color .15s, box-shadow .15s; }
+  .card:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+  .thumb { height: 150px; overflow: hidden; position: relative; background: #fff; border-bottom: 1px solid var(--border); }
+  .thumb .shot { width: 100%; height: 100%; object-fit: cover; object-position: top left; display: block; }
+  .thumb .missing { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); background: var(--bg); font-size: 13px; }
+  .info { padding: 10px 12px 12px; display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; }
+  .info .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .info .meta { grid-column: 1 / -1; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pills { grid-column: 1 / -1; display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .pill { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+  .pill.deploy { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .more { border: 0; background: none; cursor: pointer; width: 28px; height: 28px; border-radius: 50%; font-size: 16px; color: var(--muted); }
+  .more:hover { background: var(--bg); }
+  .menu { position: fixed; z-index: 30; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px; min-width: 210px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 11px; border-radius: 7px; cursor: pointer; }
+  .menu button:hover { background: var(--accent-soft); }
+  .menu button.danger { color: var(--bad); }
+  .menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 0; }
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); border: 2px dashed var(--border); border-radius: var(--radius); }
+  .drop { position: fixed; inset: 0; z-index: 40; background: rgba(47,111,237,.12); border: 3px dashed var(--accent); display: none; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; color: var(--accent); pointer-events: none; }
+  body.dragging .drop { display: flex; }
+  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(560px, 94vw); background: var(--panel); color: var(--fg); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dh { padding: 14px 18px; border-bottom: 1px solid var(--border); font-weight: 700; display: flex; justify-content: space-between; }
+  .db { padding: 14px 18px; }
+  .df { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+  .field { margin: 10px 0; }
+  .field label { display: block; font-size: 12.5px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  .field input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+  .switch { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; }
+  .switch small { display: block; color: var(--muted); }
+  .progress { height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; margin-top: 10px; }
+  .progress div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 10px 18px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 50; }
+  .toast.show { opacity: 1; }
+  .muted { color: var(--muted); }
+  .banner { padding: 9px 12px; border-radius: 8px; background: var(--bad-soft); color: var(--bad); margin: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <img src="/static/app.png" alt="">
+  <h1>사이트 편집기</h1>
+  <label class="search"><span>🔍</span><input id="q" type="search" placeholder="프로젝트 검색 (이름 · 폴더)" autocomplete="off"></label>
+  <span id="langSlot"></span>
+  <button class="icon-btn" id="settingsBtn" title="설정">⚙</button>
+</header>
+
+<section class="start">
+  <div class="wrap">
+    <h2>새로 시작하기</h2>
+    <div class="tiles">
+      <button class="tile" id="newBtn"><div class="face">＋</div><div class="t">새로 만들기</div><div class="s">빈 사이트에서 시작</div></button>
+      <button class="tile" id="importBtn"><div class="face">🔗</div><div class="t">링크로 가져오기</div><div class="s">사이트 주소를 넣으면 그대로 복사</div></button>
+      <button class="tile" id="openBtn"><div class="face">📂</div><div class="t">열기</div><div class="s">PC에 있는 사이트 폴더</div></button>
+      <button class="tile" id="uploadFolderBtn"><div class="face">⬆️</div><div class="t">폴더 업로드</div><div class="s">복사본을 보관함에 저장</div></button>
+      <button class="tile" id="uploadZipBtn"><div class="face">🗜️</div><div class="t">zip 업로드</div><div class="s">압축 파일을 풀어 저장</div></button>
+    </div>
+    <p class="muted" style="margin:12px 0 0;font-size:12.5px">사이트 폴더나 zip 파일을 이 화면에 끌어다 놓아도 됩니다.</p>
+  </div>
+</section>
+
+<section class="recent">
+  <div class="wrap">
+    <div class="bar"><h2>최근 프로젝트</h2><span class="muted" id="count"></span></div>
+    <div class="grid" id="grid"></div>
+  </div>
+</section>
+
+<div class="drop">여기에 놓으면 업로드합니다</div>
+<input type="file" id="folderInput" webkitdirectory directory multiple hidden>
+<input type="file" id="zipInput" accept=".zip,application/zip" hidden>
+<dialog id="dlg"><div class="dh"><span id="dt"></span><button class="more" data-close>✕</button></div><div class="db" id="db"></div><div class="df" id="df"></div></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const $ = s => document.querySelector(s);
+const TYPE = { git: "GitHub Pages", sftp: "SFTP", ftp: "FTP", folder: "폴더" };
+let items = [], storage = "";
+
+async function api(path, body, raw) {
+  const opt = { headers: { "X-Editor-Token": TOKEN } };
+  if (raw !== undefined) { opt.method = "POST"; opt.body = raw; }
+  else if (body !== undefined) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({ error: "bad response" }));
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "text") n.textContent = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+  }
+  kids.flat().forEach(k => k != null && k !== false && n.append(k));
+  return n;
+}
+function ago(sec) {
+  if (!sec) return "-";
+  const d = (Date.now() / 1000 - sec);
+  if (d < 60) return "방금"; if (d < 3600) return Math.round(d / 60) + "분 전"; if (d < 86400) return Math.round(d / 3600) + "시간 전";
+  return new Date(sec * 1000).toLocaleDateString();
+}
+const openProject = id => { location.href = "/p/" + id + "/"; };
+
+// ---------- list ----------
+async function load() {
+  const r = await api("/api/projects?q=" + encodeURIComponent($("#q").value));
+  items = r.projects; storage = r.storage;
+  render();
+}
+function render() {
+  const g = $("#grid"); g.innerHTML = "";
+  $("#count").textContent = items.length ? items.length + "개" : "";
+  if (!items.length) {
+    g.append(el("div", { class: "empty", style: "grid-column:1/-1" },
+      el("p", { text: $("#q").value ? "검색 결과가 없습니다." : "아직 프로젝트가 없습니다. 위에서 새로 만들거나, 사이트 폴더를 열거나 끌어다 놓으세요." }),
+      $("#q").value ? null : el("button", { class: "btn primary", text: "예시 사이트로 시작하기", onclick: () => createFrom(exampleTemplate(), T("예시 사이트")) })));
+    return;
+  }
+  for (const p of items) {
+    const thumb = el("div", { class: "thumb" });
+    if (p.exists && p.entry) {
+      const ph = el("div", { class: "missing", text: "미리보기 만드는 중…" });
+      const img = el("img", { class: "shot", alt: "", loading: "lazy", src: `/p/${p.id}/thumb.png?m=${Math.round(p.modified || 0)}` });
+      img.onload = () => ph.remove();
+      img.onerror = () => { img.remove(); ph.textContent = p.entry; };
+      thumb.append(img, ph);
+    } else thumb.append(el("div", { class: "missing", text: p.exists ? "HTML 페이지 없음" : "폴더를 찾을 수 없음" }));
+    const pills = el("div", { class: "pills" },
+      el("span", { class: "pill", text: p.managed ? "보관함" : "PC 폴더" }),
+      p.source_url ? el("span", { class: "pill", title: p.source_url, text: "출처: " + new URL(p.source_url).host }) : null,
+      p.is_git ? el("span", { class: "pill", text: "git" }) : null,
+      (p.targets || []).map(t => el("span", { class: "pill deploy", text: "배포: " + (TYPE[t.type] || t.type) })));
+    const more = el("button", { class: "more", title: "더 보기", text: "⋮", onclick: e => { e.stopPropagation(); cardMenu(p, e.currentTarget); } });
+    const card = el("div", { class: "card", tabindex: "0", title: p.path, onclick: () => p.exists ? openProject(p.id) : toast("폴더를 찾을 수 없습니다. 목록에서 빼거나 다시 여세요"),
+      onkeydown: e => { if (e.key === "Enter") card.click(); } },
+      thumb, el("div", { class: "info" }, el("span", { class: "name", translate: "no", text: p.name }), more,
+        el("span", { class: "meta", title: p.path, text: `수정 ${ago(p.modified)} · ${p.path.split(/[\\/]/).pop()}` }), pills));
+    g.append(card);
+  }
+}
+let qTimer; $("#q").addEventListener("input", () => { clearTimeout(qTimer); qTimer = setTimeout(load, 200); });
+
+// ---------- card menu ----------
+let openMenu = null;
+function closeMenu() { if (openMenu) { openMenu.remove(); openMenu = null; } }
+document.addEventListener("click", closeMenu);
+addEventListener("scroll", closeMenu, true);
+function cardMenu(p, anchor) {
+  closeMenu();
+  const act = fn => async e => { e.stopPropagation(); closeMenu(); try { await fn(); } catch (x) { toast(x.message); } };
+  const m = el("div", { class: "menu", onclick: e => e.stopPropagation() },
+    el("button", { text: "열기", onclick: act(() => openProject(p.id)) }),
+    el("button", { text: "이름 바꾸기", onclick: act(async () => { const n = prompt("새 이름 (폴더와 배포 설정은 그대로)", p.name); if (n) { await api("/api/projects/rename", { id: p.id, name: n }); load(); } }) }),
+    el("button", { text: "사본 만들기", onclick: act(async () => { const r = await api("/api/projects/duplicate", { id: p.id }); toast(`'${r.name}' 를 만들었습니다`); load(); }) }),
+    el("button", { text: "탐색기에서 폴더 열기", onclick: act(() => api("/api/projects/reveal", { id: p.id })) }),
+    el("button", { text: "zip 으로 내보내기", onclick: act(() => { location.href = `/p/${p.id}/export.zip`; }) }),
+    el("hr"),
+    el("button", { text: "목록에서 빼기 (파일은 그대로)", onclick: act(async () => { if (confirm(`'${p.name}' 를 목록에서 뺄까요?\n폴더와 파일은 지우지 않습니다.`)) { await api("/api/projects/remove", { id: p.id }); toast("목록에서 뺐습니다"); load(); } }) }),
+    p.managed ? el("button", { class: "danger", text: "삭제…", onclick: act(() => deleteDialog(p)) }) : null);
+  document.body.append(m);
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.min(r.left, innerWidth - 230) + "px"; m.style.top = Math.min(r.bottom + 4, innerHeight - m.offsetHeight - 8) + "px";
+  openMenu = m;
+}
+
+// ---------- dialogs ----------
+function dialog(title) { $("#dt").textContent = title; $("#db").innerHTML = ""; $("#df").innerHTML = ""; $("#dlg").showModal(); return [$("#db"), $("#df")]; }
+$("#dlg").addEventListener("click", e => { if (e.target.closest("[data-close]")) $("#dlg").close(); });
+function deleteDialog(p) {
+  const [b, f] = dialog("프로젝트 삭제");
+  const inp = el("input", { type: "text", placeholder: p.name });
+  b.append(el("p", {}, `보관함에 있는 '${p.name}' 폴더를 지웁니다. 실제로는 휴지통 폴더(~/.site-editor/trash)로 옮겨져서 나중에 되살릴 수 있습니다.`),
+    el("div", { class: "field" }, el("label", { text: "확인을 위해 프로젝트 이름을 입력하세요" }), inp));
+  const go = el("button", { class: "btn danger", text: "삭제", disabled: true, onclick: async () => {
+    try { const r = await api("/api/projects/delete", { id: p.id, confirm: inp.value }); $("#dlg").close(); toast("휴지통으로 옮겼습니다"); load(); } catch (x) { b.append(el("div", { class: "banner", text: x.message })); } } });
+  inp.oninput = () => go.disabled = inp.value !== p.name;
+  f.append(el("button", { class: "btn", "data-close": "", text: "취소" }), go);
+}
+const exampleTemplate = () => (window.SE_I18N && SE_I18N.lang === "en" ? "example-en" : "example-ko");
+async function createFrom(template, name) {
+  try { const r = await api("/api/projects/new", { name, template }); openProject(r.id); } catch (x) { toast(x.message); }
+}
+$("#newBtn").onclick = () => {
+  const [b, f] = dialog("새로 만들기");
+  const inp = el("input", { type: "text", value: T("예시 사이트") });
+  let tpl = exampleTemplate();
+  const choice = (value, title, desc) => {
+    const r = el("input", { type: "radio", name: "tpl", value });
+    r.checked = value === tpl;
+    r.onchange = () => { tpl = value; inp.value = T(value === "blank" ? "새 사이트" : "예시 사이트"); };
+    return el("label", { class: "switch" }, r, el("span", {}, title, el("small", { text: desc })));
+  };
+  b.append(choice(exampleTemplate(), "예시 사이트 (카페)", "사진·메뉴 카드·소개가 들어 있는 완성된 한 쪽짜리 사이트. 바로 고쳐 보며 익히기 좋습니다."),
+    choice("blank", "빈 사이트", "제목과 글 두 칸만 있는 깨끗한 시작"),
+    el("div", { class: "field" }, el("label", { text: "프로젝트 이름" }), inp));
+  f.append(el("button", { class: "btn", "data-close": "", text: "취소" }), el("button", { class: "btn primary", text: "만들기", onclick: () => createFrom(tpl, inp.value) }));
+  setTimeout(() => inp.select(), 50);
+};
+$("#openBtn").onclick = async () => {
+  toast("폴더 선택 창을 여는 중… (작업 표시줄에 숨어 있을 수 있습니다)");
+  try {
+    const r = await api("/api/projects/open", {});
+    if (r.cancelled) return;
+    openProject(r.id);
+  } catch (x) { manualOpen(x.message); }
+};
+function manualOpen(err) {
+  const [b, f] = dialog("폴더 열기");
+  const inp = el("input", { type: "text", placeholder: "예: C:\\Users\\나\\Documents\\my-site" });
+  if (err) b.append(el("div", { class: "banner", text: err }));
+  b.append(el("div", { class: "field" }, el("label", { text: "사이트 폴더 경로 (index.html 이 있는 폴더)" }), inp),
+    el("p", { class: "muted", text: "폴더는 옮기거나 복사하지 않고 그 자리에서 편집합니다." }));
+  f.append(el("button", { class: "btn", "data-close": "", text: "취소" }), el("button", { class: "btn primary", text: "열기", onclick: async () => {
+    try { const r = await api("/api/projects/open", { path: inp.value }); openProject(r.id); } catch (x) { b.prepend(el("div", { class: "banner", text: x.message })); } } }));
+}
+
+// ---------- import from a link ----------
+$("#importBtn").onclick = () => {
+  const [b, f] = dialog("링크로 가져오기");
+  const url = el("input", { type: "text", placeholder: "https://example.com" });
+  const name = el("input", { type: "text", placeholder: "비우면 사이트 주소로" });
+  const pages = el("input", { type: "number", value: 20, min: 1, max: 200, style: "width:90px;padding:7px;border:1px solid var(--border);border-radius:8px;background:var(--bg)" });
+  const rendered = el("input", { type: "checkbox" });
+  b.append(
+    el("div", { class: "field" }, el("label", { text: "사이트 주소" }), url),
+    el("div", { class: "field" }, el("label", { text: "프로젝트 이름" }), name),
+    el("div", { class: "field" }, el("label", { text: "최대 페이지 수 (같은 사이트 안의 링크를 따라가며 복사)" }), pages),
+    el("label", { class: "switch" }, rendered, el("span", {}, "스크립트로 그려지는 사이트 (화면 그대로 가져오기)",
+      el("small", { text: "React·Vue 처럼 자바스크립트가 내용을 그리는 사이트용. 화면 없는 Edge 로 열어 다 그려진 모습을 저장하고 스크립트는 뺍니다." }))),
+    el("p", { class: "muted", style: "font-size:12.5px", text: "같은 사이트의 HTML · CSS · JS · 이미지 · 폰트를 복사하고 링크를 상대 경로로 바꿉니다. 다른 사이트(CDN 등) 링크는 그대로 둡니다. 내 사이트이거나 복사할 권리가 있는 사이트만 가져오세요." }));
+  const go = el("button", { class: "btn primary", text: "가져오기", onclick: async () => {
+    go.disabled = true;
+    try { await api("/api/projects/import", { url: url.value, name: name.value, max_pages: +pages.value || 20, rendered: rendered.checked }); }
+    catch (x) { go.disabled = false; return b.prepend(el("div", { class: "banner", text: x.message })); }
+    b.innerHTML = ""; f.innerHTML = "";
+    const log = el("div", { class: "muted", style: "font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;max-height:260px;overflow:auto" });
+    b.append(el("p", { text: "가져오는 중… 사이트 크기에 따라 몇십 초 걸릴 수 있습니다." }), log);
+    const poll = async () => {
+      const j = await api("/api/projects/import");
+      log.textContent = (j.log || []).slice(-40).join("\n"); log.scrollTop = log.scrollHeight;
+      if (j.state === "running") return setTimeout(poll, 800);
+      if (j.state === "failed") { b.append(el("div", { class: "banner", text: "실패: " + j.error })); f.append(el("button", { class: "btn", "data-close": "", text: "닫기" })); return; }
+      if (j.result) openProject(j.result.id);
+    };
+    poll();
+  } });
+  f.append(el("button", { class: "btn", "data-close": "", text: "취소" }), go);
+  setTimeout(() => url.focus(), 50);
+};
+
+// ---------- upload ----------
+function progressDialog(title) {
+  const [b, f] = dialog(title);
+  const bar = el("div"), text = el("div", { class: "muted", text: "준비 중…" });
+  b.append(text, el("div", { class: "progress" }, bar));
+  return { set(done, total, label) { bar.style.width = (total ? done / total * 100 : 0) + "%"; text.textContent = label || `${done} / ${total}`; }, b, f };
+}
+async function uploadFiles(files, name) {
+  const list = files.filter(x => !/(^|\/)(\.git|node_modules|__pycache__)\//.test(x.path));
+  if (!list.length) return toast("올릴 파일이 없습니다");
+  const total = list.reduce((s, x) => s + x.file.size, 0);
+  if (total > 200 * 1024 * 1024) return toast("200MB 보다 큰 폴더는 '열기'로 여세요");
+  const pd = progressDialog("업로드 중");
+  try {
+    const up = await api("/api/projects/upload-start", { name });
+    let done = 0;
+    for (const x of list) {
+      await api(`/api/projects/upload-file?upload=${up.upload}&path=${encodeURIComponent(x.path)}`, undefined, x.file);
+      done++; pd.set(done, list.length, `${done} / ${list.length} 파일`);
+    }
+    const p = await api("/api/projects/upload-finish", { upload: up.upload });
+    openProject(p.id);
+  } catch (x) { pd.b.append(el("div", { class: "banner", text: x.message })); pd.f.append(el("button", { class: "btn", "data-close": "", text: "닫기" })); }
+}
+async function uploadZip(file) {
+  const pd = progressDialog("zip 푸는 중");
+  try { const p = await api("/api/projects/upload-zip?name=" + encodeURIComponent(file.name.replace(/\.zip$/i, "")), undefined, file); openProject(p.id); }
+  catch (x) { pd.b.append(el("div", { class: "banner", text: x.message })); pd.f.append(el("button", { class: "btn", "data-close": "", text: "닫기" })); }
+}
+$("#uploadFolderBtn").onclick = () => $("#folderInput").click();
+$("#uploadZipBtn").onclick = () => $("#zipInput").click();
+$("#folderInput").onchange = e => {
+  const fs = [...e.target.files]; if (!fs.length) return;
+  const root = fs[0].webkitRelativePath.split("/")[0];
+  uploadFiles(fs.map(f => ({ file: f, path: f.webkitRelativePath.split("/").slice(1).join("/") })), root);
+  e.target.value = "";
+};
+$("#zipInput").onchange = e => { const f = e.target.files[0]; if (f) uploadZip(f); e.target.value = ""; };
+function readEntry(entry, prefix) {
+  return new Promise(res => {
+    if (entry.isFile) entry.file(f => res([{ file: f, path: prefix + f.name }]), () => res([]));
+    else if (entry.isDirectory) {
+      const reader = entry.createReader(), all = [];
+      const next = () => reader.readEntries(async ents => {
+        if (!ents.length) { const nested = await Promise.all(all.map(en => readEntry(en, prefix + entry.name + "/"))); res(nested.flat()); }
+        else { all.push(...ents); next(); }
+      }, () => res([]));
+      next();
+    } else res([]);
+  });
+}
+let dragDepth = 0;
+addEventListener("dragenter", e => { if ([...e.dataTransfer.types].includes("Files")) { dragDepth++; document.body.classList.add("dragging"); } });
+addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); } });
+addEventListener("dragover", e => e.preventDefault());
+addEventListener("drop", async e => {
+  e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging");
+  const entries = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (entries.length === 1 && entries[0].isFile && /\.zip$/i.test(entries[0].name)) return entries[0].file(f => uploadZip(f));
+  if (entries.length === 1 && entries[0].isDirectory) {
+    const files = await readEntry(entries[0], "");
+    return uploadFiles(files.map(x => ({ file: x.file, path: x.path.split("/").slice(1).join("/") })), entries[0].name);
+  }
+  const files = (await Promise.all(entries.map(en => readEntry(en, "")))).flat();
+  uploadFiles(files, "업로드한 사이트");
+});
+
+// ---------- settings ----------
+$("#settingsBtn").onclick = async () => {
+  const [b, f] = dialog("설정");
+  b.append(el("p", { class: "muted", text: "불러오는 중…" }));
+  let s; try { s = await api("/api/settings"); } catch (x) { b.textContent = x.message; return; }
+  b.innerHTML = "";
+  const startup = el("input", { type: "checkbox" }); startup.checked = s.startup;
+  const store = el("input", { type: "text", value: s.storage });
+  b.append(
+    el("label", { class: "switch" }, startup, el("span", {}, "Windows 를 켤 때 조용히 대기", el("small", { text: "켜 두면 바로가기를 누르자마자 창이 뜹니다. 창 없이 뒤에서 기다리기만 합니다." }))),
+    el("div", { class: "field" }, el("label", { text: "보관함 위치 (새로 만들기 · 업로드 · 사본이 저장되는 곳)" }), store),
+    el("p", { class: "muted", text: "서버 비밀번호 보관: " + (s.secret_store === "keyring" ? "Windows 자격 증명 관리자" : "이 사용자만 읽는 로컬 파일") }),
+    el("button", { class: "btn", text: "바탕화면 · 시작 메뉴 바로가기 만들기", onclick: async () => { try { const r = await api("/api/install", {}); toast("바로가기를 만들었습니다"); } catch (x) { toast(x.message); } } }));
+  f.append(el("button", { class: "btn", "data-close": "", text: "닫기" }), el("button", { class: "btn primary", text: "저장", onclick: async () => {
+    try { await api("/api/settings", { startup: startup.checked, storage: store.value }); $("#dlg").close(); toast("설정을 저장했습니다"); load(); } catch (x) { toast(x.message); } } }));
+};
+
+load().catch(e => toast("불러오기 실패: " + e.message));
+</script>
+</body>
+</html>

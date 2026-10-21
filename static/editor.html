@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사이트 편집기 · __SITE__</title>
+<script src="/static/i18n.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f9; --panel: #ffffff; --fg: #16181d; --muted: #5b6270; --border: #e1e4ea;
+    --accent: #2f6fed; --accent-soft: #e8f0fd; --ok: #1a7f37; --ok-soft: #e6f4ea; --bad: #c62828; --bad-soft: #fdecea;
+    --warn-soft: #fff6e0; --radius: 10px; color-scheme: light;
+    font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --panel: #161920; --fg: #e8eaee; --muted: #9aa2b1; --border: #2a2f39;
+      --accent: #6ea8ff; --accent-soft: #17243a; --ok: #4ac26b; --ok-soft: #12261a; --bad: #ff7b72; --bad-soft: #2d1414;
+      --warn-soft: #2b2410; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-size: 14px; height: 100vh; display: flex; flex-direction: column; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  header { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border); background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0 10px 0 0; white-space: nowrap; }
+  header .status { color: var(--muted); font-size: 13px; margin-right: auto; }
+  .btn { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; font-weight: 600; white-space: nowrap; }
+  .btn:hover { background: var(--bg); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { color: var(--bad); }
+  .btn.small { height: 27px; padding: 0 9px; font-size: 12.5px; font-weight: 500; }
+  .btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  main { flex: 1; display: grid; grid-template-columns: minmax(360px, 40%) 1fr; min-height: 0; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } #previewPane { min-height: 70vh; } }
+  #side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border); }
+  .tabs { display: flex; gap: 2px; padding: 6px 10px 0; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .tab { border: 0; background: none; padding: 8px 11px; border-bottom: 2px solid transparent; cursor: pointer; color: var(--muted); font-weight: 600; }
+  .tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+  .pane { flex: 1; overflow: auto; padding: 12px 14px 60px; }
+  .pane[hidden] { display: none; }
+  details.sec, .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; }
+  details.sec > summary { padding: 10px 13px; cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary .count { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+  .sec-body, .card-body { padding: 4px 13px 12px; }
+  .card h3 { margin: 0; padding: 10px 13px 0; font-size: 13.5px; }
+  .field { margin: 9px 0; }
+  .field > label, .label { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  input[type=text], input[type=url], input[type=number], input[type=password], textarea, select.in { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); }
+  textarea { resize: vertical; min-height: 52px; line-height: 1.5; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .bi { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .bi .lang { font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 2px; display: block; }
+  @media (max-width: 1200px) { .bi { grid-template-columns: 1fr; } }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .grid4 small { display: block; color: var(--muted); font-size: 11px; text-align: center; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .row > input[type=range] { flex: 1; }
+  .unit { color: var(--muted); font-size: 12px; }
+  .item { border: 1px solid var(--border); border-radius: 9px; margin: 8px 0; background: var(--panel); }
+  .item > .item-head { display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 11px; border-bottom: 1px solid var(--border); background: var(--bg); border-radius: 9px 9px 0 0; }
+  .item > .item-head .title { flex: 1; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .item > .item-body { padding: 2px 11px 10px; }
+  .item.collapsed > .item-body { display: none; }
+  .icon { width: 27px; height: 27px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; font-size: 13px; line-height: 1; }
+  .strlist .srow { display: flex; gap: 6px; margin: 4px 0; }
+  .check { display: flex; gap: 8px; align-items: center; }
+  .img-field { display: grid; grid-template-columns: 88px 1fr; gap: 10px; align-items: start; }
+  .thumb { width: 88px; height: 66px; border-radius: 7px; border: 1px dashed var(--border); object-fit: cover; background: var(--bg); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; }
+  #previewPane { display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
+  .pv-bar { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-bottom: 1px solid var(--border); background: var(--panel); flex-wrap: wrap; }
+  .pv-bar .note { color: var(--muted); font-size: 12.5px; margin-right: auto; }
+  .frame-wrap { flex: 1; display: flex; justify-content: center; overflow: auto; }
+  iframe { border: 0; width: 100%; height: 100%; background: #fff; }
+  .frame-wrap.mobile iframe { width: 390px; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .steps { margin: 6px 0 0; padding-left: 20px; line-height: 1.75; }
+  .steps b { color: var(--accent); }
+  .selname { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--bg); padding: 2px 6px; border-radius: 5px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: var(--panel); padding: 5px 10px; cursor: pointer; font-size: 12.5px; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .rule { font-family: ui-monospace, Consolas, monospace; font-size: 12px; border-bottom: 1px solid var(--border); padding: 6px 0; display: flex; gap: 6px; align-items: flex-start; }
+  .rule .sel { flex: 1; word-break: break-all; }
+  .rule .sel small { color: var(--muted); display: block; }
+  .files-list button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+  .files-list button:hover, .files-list button.on { background: var(--accent-soft); }
+  .code { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; min-height: 360px; white-space: pre; tab-size: 2; }
+  .hist { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .hist .meta { flex: 1; }
+  .hist .meta small { color: var(--muted); display: block; }
+  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(940px, 95vw); max-height: 92vh; background: var(--panel); color: var(--fg); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg-head { padding: 13px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .dlg-head h2 { margin: 0; font-size: 16px; }
+  .dlg-body { padding: 13px 18px; overflow: auto; max-height: calc(92vh - 130px); }
+  .dlg-foot { padding: 11px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  pre.diff { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; overflow: auto; max-height: 50vh; font-size: 12px; line-height: 1.45; margin: 8px 0; }
+  .add-l { background: var(--ok-soft); color: var(--ok); display: block; }
+  .del-l { background: var(--bad-soft); color: var(--bad); display: block; }
+  .hunk { color: var(--accent); display: block; }
+  .banner { padding: 9px 12px; border-radius: 8px; margin: 8px 0; }
+  .banner.bad { background: var(--bad-soft); color: var(--bad); }
+  .banner.warn { background: var(--warn-soft); }
+  .banner.ok { background: var(--ok-soft); color: var(--ok); }
+  .banner.info { background: var(--accent-soft); }
+  .log { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--bg); border-radius: 8px; padding: 10px; white-space: pre-wrap; }
+  .menu { position: relative; }
+  .menu-list { position: absolute; top: 36px; left: 0; z-index: 20; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px; min-width: 250px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .menu-list button, .menu-check { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px; align-items: center; }
+  .menu-list button:hover, .menu-check:hover { background: var(--accent-soft); }
+  .menu-list kbd { color: var(--muted); font-family: inherit; font-size: 12px; }
+  .menu-list hr { border: 0; border-top: 1px solid var(--border); margin: 5px 0; }
+  .menu-check { justify-content: flex-start; }
+  a.btn { display: inline-flex; align-items: center; text-decoration: none; color: inherit; }
+  .saved-ok { color: var(--ok); }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 9px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+  .toast.show { opacity: 1; }
+  .muted { color: var(--muted); }
+  .dirty-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e3a008; margin-right: 6px; vertical-align: middle; }
+  .tgt { display: flex; gap: 8px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .tgt .meta { flex: 1; }
+  .tgt .meta small { color: var(--muted); display: block; word-break: break-all; }
+  .pill { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <a class="btn" href="/" title="홈 (프로젝트 목록)" id="homeBtn">⌂</a>
+  <h1><span id="projName" translate="no">__SITE__</span></h1>
+  <div class="menu" id="fileMenu">
+    <button class="btn" id="fileMenuBtn" aria-haspopup="true" aria-expanded="false">파일 ▾</button>
+    <div class="menu-list" id="fileMenuList" hidden>
+      <button data-m="home">홈 · 다른 프로젝트 열기 <kbd>⌂</kbd></button>
+      <button data-m="save">저장 <kbd>Ctrl+S</kbd></button>
+      <button data-m="saveas">다른 이름으로 저장(복제)…</button>
+      <button data-m="rename">이름 바꾸기…</button>
+      <hr>
+      <button data-m="history">버전 기록 · 되돌리기</button>
+      <button data-m="export">내보내기 (zip 내려받기)</button>
+      <button data-m="reveal">탐색기에서 폴더 열기</button>
+      <hr>
+      <button data-m="deploy">배포…</button>
+      <button data-m="targets">배포 대상(서버) 설정…</button>
+      <hr>
+      <label class="menu-check"><input type="checkbox" id="autoSave"> 자동 저장</label>
+    </div>
+  </div>
+  <span class="status" id="status">불러오는 중…</span>
+  <button class="btn" id="undoBtn" title="실행 취소 (Ctrl+Z)">↶</button>
+  <button class="btn" id="redoBtn" title="다시 실행 (Ctrl+Y)">↷</button>
+  <button class="btn" id="diffBtn">코드 변경 보기</button>
+  <button class="btn" id="revertBtn">저장 전 변경 취소</button>
+  <button class="btn primary" id="saveBtn" title="Ctrl+S">저장</button>
+  <button class="btn" id="deployBtn">배포…</button>
+  <span id="langSlot"></span>
+</header>
+<main>
+  <section id="side">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="design">디자인</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="content">내용</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="files">파일</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="history">되돌리기 기록</button>
+    </div>
+    <div class="pane" id="pane-design"></div>
+    <div class="pane" id="pane-content" hidden></div>
+    <div class="pane" id="pane-files" hidden>
+      <p class="muted">HTML 구조나 CSS를 직접 고칠 때 씁니다. 저장할 때마다 되돌리기 기록이 남습니다.</p>
+      <div class="files-list" id="fileList" translate="no"></div>
+      <div id="fileEditor" hidden>
+        <div class="field"><label id="fileLabel" translate="no"></label><textarea class="code" id="fileText" spellcheck="false"></textarea></div>
+        <button class="btn primary small" id="fileSave">파일 저장</button>
+        <button class="btn small danger" id="fileDiscard">배포된 상태로 되돌리기</button>
+      </div>
+    </div>
+    <div class="pane" id="pane-history" hidden>
+      <p class="muted">저장하기 전 상태가 자동으로 남습니다. 복원해도 지금 상태가 먼저 기록되므로 다시 되돌릴 수 있습니다.</p>
+      <div id="histList"></div>
+    </div>
+  </section>
+  <section id="previewPane">
+    <div class="pv-bar">
+      <select class="in" id="pageSel" style="width:auto" title="편집할 페이지"></select>
+      <span class="note" id="pvNote">페이지에서 요소를 클릭하세요</span>
+      <span class="seg"><button id="pvDesktop" class="on">데스크톱</button><button id="pvMobile">휴대폰</button></span>
+      <button class="btn small" id="pvReload">새로고침</button>
+    </div>
+    <div class="frame-wrap" id="frameWrap"><iframe id="preview" title="사이트 편집 화면"></iframe></div>
+  </section>
+</main>
+
+<dialog id="dlg"><div class="dlg-head"><h2 id="dlgTitle"></h2><button class="icon" data-close aria-label="닫기">✕</button></div>
+  <div class="dlg-body" id="dlgBody"></div><div class="dlg-foot" id="dlgFoot"></div></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const BASE = "__BASE__";                 // /p/<project id>
+const PID = BASE.split("/")[2];
+const API = "/api" + BASE;
+const FONT_IMPORTS = { "Noto Sans KR": "Noto+Sans+KR:wght@400;500;700", "Nanum Gothic": "Nanum+Gothic:wght@400;700",
+  "Nanum Myeongjo": "Nanum+Myeongjo:wght@400;700", "Gowun Dodum": "Gowun+Dodum", "IBM Plex Sans KR": "IBM+Plex+Sans+KR:wght@400;500;700",
+  "Inter": "Inter:wght@400;500;700", "Playfair Display": "Playfair+Display:wght@400;700" };
+const FONTS = [["", "그대로"], ["Pretendard, 'Noto Sans KR', sans-serif", "Pretendard"], ["'Noto Sans KR', sans-serif", "Noto Sans KR"],
+  ["'Nanum Gothic', sans-serif", "나눔고딕"], ["'Nanum Myeongjo', serif", "나눔명조"], ["'Gowun Dodum', sans-serif", "고운돋움"],
+  ["'IBM Plex Sans KR', sans-serif", "IBM Plex Sans KR"], ["Inter, sans-serif", "Inter"], ["'Playfair Display', serif", "Playfair Display"],
+  ["Georgia, serif", "Georgia (serif)"], ["ui-monospace, Consolas, monospace", "고정폭"]];
+const $ = (s, r = document) => r.querySelector(s);
+const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
+
+// ---------- state ----------
+const S = { data: null, name: "SITE", rules: [], html: [], contentAvailable: false };
+let saved = { data: null, rules: [] };
+let undo = [], redo = [], gesture = false, page = "index.html", media = "", scope = "one", sel = null, editingText = false;
+let autosaveArmed = false, autosaveTimer = null, saving = false, lastSavedAt = null;
+const AUTO_KEY = "se-autosave-" + PID;
+let autoSaveOn = (() => { try { return localStorage.getItem(AUTO_KEY) !== "0"; } catch (e) { return true; } })();
+let pendingReselect = null, draftTimer = null;
+
+async function api(path, body) {
+  return call(path.replace(/^\/api\//, API + "/"), body);
+}
+async function homeApi(path, body) { return call(path, body); }
+async function call(path, body) {
+  const opt = { headers: { "X-Editor-Token": TOKEN } };
+  if (body !== undefined) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({ error: "bad response" }));
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); }
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "text") n.textContent = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+  }
+  kids.flat().forEach(k => k != null && k !== false && n.append(k));
+  return n;
+}
+const frame = () => $("#preview").contentWindow;
+const bridge = () => { try { return frame().SEB; } catch (e) { return null; } };
+
+function snapshot() { return JSON.stringify({ data: S.data, rules: S.rules, html: S.html }); }
+function pushUndo() { undo.push(snapshot()); if (undo.length > 300) undo.shift(); redo = []; autosaveArmed = true; updateButtons(); }
+function restoreSnap(s) { const o = JSON.parse(s); S.data = o.data; S.rules = o.rules; S.html = o.html; }
+function isDirty() { return S.html.length > 0 || JSON.stringify(S.data) !== JSON.stringify(saved.data) || JSON.stringify(S.rules) !== JSON.stringify(saved.rules); }
+function ago(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  return s < 10 ? "방금" : s < 60 ? `${s}초 전` : s < 3600 ? `${Math.round(s / 60)}분 전` : new Date(t).toLocaleTimeString().slice(0, -3);
+}
+function updateButtons() {
+  const d = isDirty();
+  const st = $("#status");
+  if (saving) st.textContent = "저장 중…";
+  else if (d) st.innerHTML = '<span class="dirty-dot"></span>' + (autoSaveOn ? "변경 사항 저장 대기 중…" : "저장하지 않은 변경 있음 (자동 저장 꺼짐)");
+  else st.innerHTML = '<span class="saved-ok">✓ 모든 변경 저장됨</span>' + (lastSavedAt ? " · " + ago(lastSavedAt) : "") + " · 공개하려면 배포";
+  $("#saveBtn").disabled = !d; $("#revertBtn").disabled = !d; $("#diffBtn").disabled = !d;
+  $("#undoBtn").disabled = !undo.length; $("#redoBtn").disabled = !redo.length;
+  scheduleAutosave();
+}
+setInterval(() => { if (!isDirty() && !saving) updateButtons(); }, 30000);
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  if (!autoSaveOn || !autosaveArmed || !isDirty()) return;
+  autosaveTimer = setTimeout(() => {
+    if (editingText || gesture || saving || document.querySelector("dialog[open]")) return scheduleAutosave();
+    save(true);
+  }, 1500);
+}
+
+// ---------- live CSS ----------
+function cssText() {
+  const fonts = new Set();
+  S.rules.forEach(r => (r.props["font-family"] || "").split(",").forEach(f => { f = f.trim().replace(/^['"]|['"]$/g, ""); if (FONT_IMPORTS[f]) fonts.add(f); }));
+  let css = fonts.size ? `@import url("https://fonts.googleapis.com/css2?${[...fonts].sort().map(f => "family=" + FONT_IMPORTS[f]).join("&")}&display=swap");\n` : "";
+  const block = (rs, ind = "") => rs.map(r => `${ind}${r.selector} {\n${Object.entries(r.props).map(([k, v]) => `${ind}  ${k}: ${v};`).join("\n")}\n${ind}}`).join("\n");
+  css += block(S.rules.filter(r => !r.media));
+  const mob = S.rules.filter(r => r.media === "mobile");
+  if (mob.length) css += `\n@media (max-width: 720px) {\n${block(mob, "  ")}\n}`;
+  return css;
+}
+function applyLive() { const b = bridge(); if (b) b.applyCss(cssText()); }
+function currentSelector() { return sel ? (scope === "kind" ? sel.selectorKind : sel.selectorOne) : null; }
+function ruleFor(selector, m = media) { return S.rules.find(r => r.selector === selector && r.media === m); }
+function mergeRule(selector, props) {
+  let r = ruleFor(selector);
+  if (!r) { r = { selector, media, props: {} }; S.rules.push(r); }
+  for (const [k, v] of Object.entries(props)) { if (v === "" || v == null) delete r.props[k]; else r.props[k] = v; }
+  if (!Object.keys(r.props).length) S.rules = S.rules.filter(x => x !== r);
+}
+
+// ---------- drafts (preview only) ----------
+function sendDraft({ data = true, html = true, reload = false } = {}) {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(async () => {
+    const body = { data: data && S.contentAvailable ? S.data : "keep" };
+    if (html) body.html = { page, edits: S.html };
+    try { await api("/api/draft", body); } catch (e) { toast(e.message); }
+    if (reload) reloadFrame();
+  }, reload ? 0 : 300);
+}
+function reloadFrame(reselect) {
+  pendingReselect = reselect || currentSelector();
+  const f = $("#preview");
+  let y = 0; try { y = f.contentWindow.scrollY; } catch (e) {}
+  f.onload = () => { try { f.contentWindow.scrollTo(0, y); } catch (e) {} };
+  f.src = BASE + "/design/" + page + "?v=" + Date.now();
+}
+
+// ---------- bridge callbacks ----------
+window.SE = {
+  ready() { applyLive(); if (pendingReselect) { bridge().reselect(pendingReselect); pendingReselect = null; } },
+  select(info) { sel = info; if (info) scope = scope === "kind" && info.kindCount > 1 ? "kind" : "one"; renderDesign(); $("#pvNote").textContent = info ? T("선택: ") + T(friendly(info.tag)) : "페이지에서 요소를 클릭하세요"; },
+  setStyle(props, opt = {}) {
+    if (!sel) return;
+    if (!gesture) pushUndo();
+    gesture = !opt.commit;
+    mergeRule(currentSelector(), props);
+    applyLive(); updateButtons();
+    if (opt.commit) setTimeout(() => { const b = bridge(); if (b) b.refreshInfo(); }, 30);
+  },
+  setText(target, value) {
+    pushUndo();
+    if (target.path) {
+      if (!S.contentAvailable) return toast("이 글자는 데이터 파일과 연결돼 있지 않습니다");
+      setPath(target.path, value);
+      sendDraft({ html: false }); renderContent();
+    } else {
+      S.html.push({ op: "inner", id: target.seId, html: value });
+      sendDraft({ data: false });
+    }
+    updateButtons(); toast("글자를 바꿨습니다 (저장 전)");
+  },
+  moveListItem(list, from, to) {
+    const arr = getPath(list);
+    if (!Array.isArray(arr)) return;
+    pushUndo();
+    arr.splice(to, 0, arr.splice(from, 1)[0]);
+    updateButtons(); renderContent();
+    sendDraft({ html: false, reload: true });
+    pendingReselect = `[data-se-list="${list}"][data-se-index="${to}"]`;
+    toast("순서를 바꿨습니다");
+  },
+  moveElement(id, target, where) {
+    pushUndo();
+    S.html.push({ op: "move", id, target, where });
+    sendDraft({ data: false }); updateButtons(); toast("순서를 바꿨습니다");
+  },
+  editing(on) { editingText = on; },
+  toast, undo: doUndo, redo: doRedo, save: () => save(false)
+};
+const NAMES = { h1: "제목", h2: "소제목", h3: "소제목", h4: "소제목", h5: "소제목", h6: "소제목", p: "글 문단", a: "링크", img: "그림",
+  button: "버튼", section: "구역", div: "상자", span: "글자", li: "목록 항목", ul: "목록", ol: "목록", nav: "메뉴", header: "맨 위 부분",
+  footer: "맨 아래 부분", article: "카드", main: "본문", strong: "굵은 글자", b: "굵은 글자", em: "기울인 글자", i: "기울인 글자",
+  figure: "그림 상자", form: "입력 양식", input: "입력 칸", label: "이름표", table: "표", video: "동영상", aside: "옆 상자", small: "작은 글자" };
+function friendly(tag) { return NAMES[tag] || "요소"; }
+function pageLang() { try { return frame().document.documentElement.lang === "en" ? "en" : "ko"; } catch (e) { return "ko"; } }
+function getPath(path) { return path.split(".").reduce((o, k) => (o == null ? o : o[k]), S.data); }
+function setPath(path, value) {
+  const keys = path.split("."), last = keys.pop();
+  const parent = keys.reduce((o, k) => o[k], S.data);
+  const cur = parent[last];
+  if (cur && typeof cur === "object" && !Array.isArray(cur) && ("ko" in cur || "en" in cur)) cur[pageLang()] = value;
+  else parent[last] = value;
+}
+
+// Undo entries are state snapshots (strings) or save boundaries ({kind: "save"}). Undoing past a
+// boundary restores the files that save replaced, so the earlier edits (whose element ids refer to
+// those files) stay valid. Redoing a boundary simply saves the same body again.
+let jumping = false;
+async function doUndo() {
+  if (!undo.length || jumping || saving) return;
+  clearTimeout(autosaveTimer); autosaveArmed = false;
+  const top = undo[undo.length - 1];
+  if (typeof top === "object") {
+    jumping = true;
+    try { await api("/api/restore-many", { ids: top.res.snapshots, created: top.res.created }); }
+    catch (e) { jumping = false; return toast("되돌리기 실패: " + e.message); }
+    undo.pop(); redo.push(top);
+    restoreSnap(top.before); saved = clone(top.savedBefore);
+    jumping = false; toast("저장하기 전 상태로 되돌렸습니다");
+  } else {
+    redo.push(snapshot()); restoreSnap(undo.pop()); gesture = false;
+  }
+  afterHistoryJump();
+}
+async function doRedo() {
+  if (!redo.length || jumping || saving) return;
+  clearTimeout(autosaveTimer); autosaveArmed = false;
+  const top = redo[redo.length - 1];
+  if (typeof top === "object") {
+    jumping = true;
+    try { top.res = await api("/api/save", top.body); }
+    catch (e) { jumping = false; return toast("다시 실행 실패: " + e.message); }
+    redo.pop(); undo.push(top);
+    restoreSnap(top.before); S.html = []; saved = { data: clone(S.data), rules: clone(S.rules) };
+    lastSavedAt = Date.now(); jumping = false;
+  } else {
+    undo.push(snapshot()); restoreSnap(redo.pop());
+  }
+  afterHistoryJump();
+}
+function afterHistoryJump() { updateButtons(); renderContent(); renderDesign(); sendDraft({ reload: true }); }
+$("#undoBtn").onclick = doUndo; $("#redoBtn").onclick = doRedo;
+
+// ---------- design panel ----------
+function hex(c) {
+  const m = String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (!m) return /^#[0-9a-f]{6}$/i.test(c) ? c : "#000000";
+  if (m[4] !== undefined && +m[4] === 0) return null;
+  return "#" + [m[1], m[2], m[3]].map(x => (+x).toString(16).padStart(2, "0")).join("");
+}
+// px measured by the browser -> "times the text size", the unit the panel shows
+const perEm = (v, digits) => { const px = parseFloat(v), fs = parseFloat(sel.computed["font-size"]) * 16; return isNaN(px) || !fs ? "" : String(Math.round(px / fs * 10 ** digits) / 10 ** digits); };
+const pxToRem = v => { const n = parseFloat(v); return isNaN(n) ? "" : String(Math.round(n / 16 * 100) / 100); };
+function prop(k) { const r = ruleFor(currentSelector()); return r && r.props[k] != null ? r.props[k] : null; }
+function numInput(key, opts) {
+  const cur = prop(key), comp = sel.computed[key];
+  const val = cur != null ? parseFloat(cur) : "";
+  const unit = opts.unit;
+  const ph = opts.ph ? opts.ph(comp) : opts.fromPx ? pxToRem(comp) : (comp ? parseFloat(comp) : "");
+  const inp = el("input", { type: "number", step: opts.step || 0.125, min: opts.min ?? "", max: opts.max ?? "", placeholder: ph === "" ? "" : String(ph), value: val === "" ? "" : val });
+  inp.addEventListener("input", () => SE.setStyle({ [key]: inp.value === "" ? "" : inp.value + unit }, { commit: false }));
+  inp.addEventListener("change", () => SE.setStyle({ [key]: inp.value === "" ? "" : inp.value + unit }, { commit: true }));
+  return inp;
+}
+function colorInput(key) {
+  const cur = prop(key), comp = hex(sel.computed[key]);
+  const inp = el("input", { type: "color", value: cur && /^#/.test(cur) ? cur : (comp || "#ffffff"), style: "width:44px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:none" });
+  inp.addEventListener("input", () => SE.setStyle({ [key]: inp.value }, { commit: false }));
+  inp.addEventListener("change", () => SE.setStyle({ [key]: inp.value }, { commit: true }));
+  return el("span", { class: "row" }, inp, cur ? el("button", { class: "btn small", text: "원래대로", onclick: () => SE.setStyle({ [key]: "" }, { commit: true }) }) : el("span", { class: "unit", text: comp ? "지금 " + comp : "없음(투명)" }));
+}
+function seg(options, current, onPick) {
+  return el("span", { class: "seg" }, options.map(([v, label]) => el("button", { class: v === current ? "on" : "", text: label, onclick: () => onPick(v) })));
+}
+function warningsFor() {
+  const out = [];
+  S.rules.forEach(r => Object.entries(r.props).forEach(([k, v]) => {
+    const m = /^(-?\d+(?:\.\d+)?)px$/.exec(v);
+    if (m && (k === "width" || k === "min-width") && +m[1] > 360) out.push(`${r.selector}: ${k} ${v} — 휴대폰보다 넓습니다. % 를 쓰세요`);
+    if (m && (k === "height" || k === "max-height")) out.push(`${r.selector}: 고정 ${k} ${v} — 글자가 잘릴 수 있습니다`);
+    if (k === "width" && parseFloat(v) > 100) out.push(`${r.selector}: 너비 ${v} — 화면 밖으로 나갈 수 있습니다`);
+  }));
+  return out;
+}
+function renderDesign() {
+  const pane = $("#pane-design");
+  const scroll = pane.scrollTop;
+  pane.innerHTML = "";
+  pane.append(el("div", { class: "row", style: "margin-bottom:10px" }, el("span", { class: "label", style: "margin:0", text: "적용할 화면" }),
+    seg([["", "모든 화면"], ["mobile", "휴대폰에서만"]], media, v => { media = v; if (v === "mobile") setDevice(true); renderDesign(); })));
+  if (!sel) {
+    pane.append(el("div", { class: "card" }, el("h3", { text: "처음 쓰는 분을 위한 순서" }), el("div", { class: "card-body" },
+      el("ol", { class: "steps" },
+        el("li", { text: "오른쪽 페이지에서 바꾸고 싶은 곳을 클릭하면 파란 테두리가 생깁니다." }),
+        el("li", { text: "테두리의 네모 손잡이를 끌면 크기가 바뀝니다. 절반·전체 같은 자리에 자석처럼 붙습니다 (Alt 를 누르면 안 붙음)." }),
+        el("li", { text: "위에 뜬 막대의 ⠿ 이동을 끌거나 상자를 끌면 순서가 바뀝니다. 분홍 선이 들어갈 자리입니다." }),
+        el("li", { text: "글자를 두 번 클릭하면 바로 입력할 수 있고, 떠 있는 막대로 크기·글꼴·굵기·색·정렬을 바꿉니다. 일부 글자만 드래그해 고르면 그 글자만 바뀝니다." }),
+        el("li", { text: "왼쪽 칸에서 간격·색·너비를 숫자로 정확히 맞출 수 있습니다." }),
+        el("li", { text: "바뀐 내용은 저절로 저장됩니다. 다 됐으면 공개하기를 눌러 인터넷에 올립니다. 실수하면 ↶ (Ctrl+Z)." })))));
+  } else {
+    const c = sel.computed;
+    pane.append(el("div", { class: "card" }, el("div", { class: "card-body", style: "padding-top:10px" },
+      el("div", { class: "row" }, el("strong", { text: "선택: " }), el("span", { text: friendly(sel.tag) }),
+        el("span", { class: "selname", translate: "no", title: currentSelector(), text: sel.label })),
+      el("div", { class: "field" }, el("span", { class: "label", text: "바꿀 범위" }),
+        seg([["one", "이 요소만"], ["kind", `같은 종류 전부 (${sel.kindCount}개)`]], scope, v => { scope = v; renderDesign(); })),
+      media ? el("div", { class: "muted", style: "font-size:12px", text: "휴대폰 화면에만 적용됩니다" }) : null,
+      sel.i18n ? el("div", { class: "banner warn", text: "이 글자는 사이트 스크립트가 언어에 맞춰 채웁니다. 글자 내용은 파일 탭에서 바꾸세요(디자인은 여기서 가능)." }) : null,
+      el("div", { class: "row", style: "margin-top:8px" },
+        sel.textEditable ? el("button", { class: "btn small", text: "✎ 글자 편집", onclick: () => { const b = bridge(); const node = b && b.current(); if (node) node.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); } }) : null,
+        ruleFor(currentSelector()) ? el("button", { class: "btn small danger", text: "이 범위 디자인 원래대로", onclick: () => { pushUndo(); S.rules = S.rules.filter(r => !(r.selector === currentSelector() && r.media === media)); applyLive(); updateButtons(); renderDesign(); setTimeout(() => bridge() && bridge().refreshInfo(), 30); } }) : null))));
+    const fontSel = el("select", { class: "in" }, FONTS.map(([v, l]) => el("option", { value: v, text: l })));
+    fontSel.value = prop("font-family") || "";
+    fontSel.onchange = () => SE.setStyle({ "font-family": fontSel.value }, { commit: true });
+    const weight = el("select", { class: "in" }, [["", "그대로"], ["300", "얇게 300"], ["400", "보통 400"], ["500", "중간 500"], ["600", "약간 굵게 600"], ["700", "굵게 700"], ["800", "아주 굵게 800"]].map(([v, l]) => el("option", { value: v, text: l })));
+    weight.value = prop("font-weight") || "";
+    weight.onchange = () => SE.setStyle({ "font-weight": weight.value }, { commit: true });
+    const sizeNow = parseFloat(prop("font-size") || c["font-size"]);
+    const sizeRange = el("input", { type: "range", min: 0.5, max: 5, step: 0.0625, value: sizeNow });
+    const sizeNum = numInput("font-size", { unit: "rem", step: 0.0625, min: 0.5 });
+    sizeNum.placeholder = c["font-size"].replace("rem", "");
+    sizeRange.addEventListener("input", () => { sizeNum.value = sizeRange.value; SE.setStyle({ "font-size": sizeRange.value + "rem" }, { commit: false }); });
+    sizeRange.addEventListener("change", () => SE.setStyle({ "font-size": sizeRange.value + "rem" }, { commit: true }));
+    pane.append(el("details", { class: "sec", open: true }, el("summary", {}, "글자"), el("div", { class: "sec-body" },
+      el("div", { class: "field" }, el("label", { text: "폰트" }), fontSel),
+      el("div", { class: "field" }, el("label", { text: "크기 (rem · 1rem = 기본 글자 크기)" }), el("div", { class: "row" }, sizeRange, el("span", { style: "width:80px" }, sizeNum))),
+      el("div", { class: "grid2" }, el("div", { class: "field" }, el("label", { text: "굵기" }), weight),
+        el("div", { class: "field" }, el("label", { text: "색" }), colorInput("color"))),
+      el("div", { class: "field" }, el("label", { text: "정렬" }), seg([["left", "왼쪽"], ["center", "가운데"], ["right", "오른쪽"], ["", "그대로"]], prop("text-align") || "", v => SE.setStyle({ "text-align": v }, { commit: true }))),
+      el("div", { class: "grid2" }, el("div", { class: "field" }, el("label", { text: "줄 간격 (배수)" }), numInput("line-height", { unit: "", step: 0.05, min: 0.8, ph: v => perEm(v, 2) })),
+        el("div", { class: "field" }, el("label", { text: "자간 (em)" }), numInput("letter-spacing", { unit: "em", step: 0.01, ph: v => perEm(v, 3) }))))));
+    const side = (prefix, label) => el("div", { class: "field" }, el("label", { text: label + " (rem)" }), el("div", { class: "grid4" },
+      ["top", "right", "bottom", "left"].map((s, i) => el("span", {}, numInput(`${prefix}-${s}`, { unit: "rem", step: 0.25, fromPx: true }), el("small", { text: ["위", "오른쪽", "아래", "왼쪽"][i] })))));
+    pane.append(el("details", { class: "sec", open: true }, el("summary", {}, "여백 · 위치"), el("div", { class: "sec-body" },
+      side("margin", "바깥 여백"), side("padding", "안쪽 여백"),
+      el("div", { class: "row" }, el("button", { class: "btn small", text: "블록 가운데 놓기", onclick: () => SE.setStyle({ "margin-left": "auto", "margin-right": "auto" }, { commit: true }) }),
+        el("button", { class: "btn small", text: "여백 원래대로", onclick: () => SE.setStyle(Object.fromEntries(["margin", "padding"].flatMap(p => ["top", "right", "bottom", "left"].map(s => [`${p}-${s}`, ""]))), { commit: true }) })))));
+    const wNow = parseFloat(prop("width") || c.width) || 100;
+    const wRange = el("input", { type: "range", min: 5, max: 100, step: 1, value: wNow });
+    const wLabel = el("span", { class: "unit", style: "width:70px", text: prop("width") || "자동" });
+    wRange.addEventListener("input", () => { wLabel.textContent = wRange.value + "%"; SE.setStyle({ width: wRange.value + "%", "max-width": "100%" }, { commit: false }); });
+    wRange.addEventListener("change", () => SE.setStyle({ width: wRange.value + "%", "max-width": "100%" }, { commit: true }));
+    pane.append(el("details", { class: "sec", open: true }, el("summary", {}, "크기 · 모양"), el("div", { class: "sec-body" },
+      el("div", { class: "field" }, el("label", { text: "너비 (감싸는 칸 대비 %)" }), el("div", { class: "row" }, wRange, wLabel,
+        el("button", { class: "btn small", text: "자동", onclick: () => SE.setStyle({ width: "", "max-width": "" }, { commit: true }) }))),
+      el("div", { class: "grid2" }, el("div", { class: "field" }, el("label", { text: "최대 너비 (rem)" }), numInput("max-width", { unit: "rem", step: 1, min: 0 })),
+        el("div", { class: "field" }, el("label", { text: "최소 높이 (rem)" }), numInput("min-height", { unit: "rem", step: 0.25, min: 0 }))),
+      el("div", { class: "grid2" }, el("div", { class: "field" }, el("label", { text: "배경색" }), colorInput("background-color")),
+        el("div", { class: "field" }, el("label", { text: "모서리 둥글기 (rem)" }), numInput("border-radius", { unit: "rem", step: 0.125, min: 0, fromPx: true }))),
+      el("div", { class: "field" }, el("label", { text: "그림자" }), seg([["", "그대로"], ["none", "없음"], ["0 2px 8px rgba(0,0,0,.08)", "약하게"], ["0 8px 24px rgba(0,0,0,.14)", "보통"]],
+        prop("box-shadow") || "", v => SE.setStyle({ "box-shadow": v }, { commit: true }))))));
+  }
+  const warns = warningsFor();
+  if (warns.length) pane.append(el("div", { class: "banner warn" }, el("strong", { text: "반응형 주의" }), el("ul", { style: "margin:4px 0 0;padding-left:18px" }, warns.map(w => el("li", { text: w })))));
+  const list = el("div");
+  S.rules.forEach(r => list.append(el("div", { class: "rule" },
+    el("div", { class: "sel", translate: "no" }, r.selector + (r.media ? "  @phone" : ""), el("small", { text: Object.entries(r.props).map(([k, v]) => `${k}: ${v}`).join("; ") })),
+    el("button", { class: "icon", title: "고르기", text: "◎", onclick: () => { const b = bridge(); if (b) b.reselect(r.selector); } }),
+    el("button", { class: "icon", title: "이 규칙 지우기", text: "✕", onclick: () => { pushUndo(); S.rules = S.rules.filter(x => x !== r); applyLive(); updateButtons(); renderDesign(); } }))));
+  pane.append(el("details", { class: "sec" }, el("summary", {}, el("span", { text: "디자인 규칙 (site-editor.css)" }), el("span", { class: "count", text: S.rules.length + "개" })),
+    el("div", { class: "sec-body" }, S.rules.length ? list : el("p", { class: "muted", text: "아직 바꾼 디자인이 없습니다." }),
+      el("p", { class: "muted", style: "font-size:12px", text: "원래 CSS 파일은 그대로 두고, 이 파일 하나에 규칙을 모읍니다. 파일과 <link> 한 줄을 지우면 모든 디자인 변경이 없어집니다." }))));
+  pane.scrollTop = scroll;
+}
+
+// ---------- content form ----------
+const LABELS = { profile: "프로필", name: "이름", photo: "프로필 사진", eyebrow: "윗줄 (소속)", headline: "한 줄 소개", lead: "소개 문단",
+  github: "GitHub 주소", email: "이메일", cv: "이력서 PDF 경로", linkedin: "LinkedIn 주소", highlights: "핵심 숫자", num: "숫자", label: "설명",
+  about: "소개 섹션", paragraphs: "문단", facts: "정보 줄", k: "항목", v: "값", href: "링크 주소", projects: "프로젝트 카드", featured: "대표 카드(가로 전체)",
+  kind: "분류", period: "기간", title: "제목", summary: "요약", problem: "문제", role: "내 역할", metrics: "성과 수치", value: "값", links: "링크",
+  tags: "태그", image: "카드 이미지", src: "이미지", alt: "대체 텍스트", skills: "기술 스택", group: "묶음 이름", items: "항목", timeline: "이력",
+  when: "시기", what: "내용", desc: "설명" };
+const BI = () => ({ ko: "", en: "" });
+const TEMPLATES = { highlights: () => ({ num: "", label: BI() }), paragraphs: BI, role: BI, facts: () => ({ k: BI(), v: BI(), href: "" }),
+  projects: () => ({ featured: false, kind: BI(), period: "", title: BI(), summary: BI(), problem: BI(), role: [BI()], metrics: [], links: [], image: { src: "", alt: BI() }, tags: [] }),
+  metrics: () => ({ value: "", label: BI() }), links: () => ({ href: "", label: BI() }), skills: () => ({ group: BI(), items: [] }),
+  timeline: () => ({ when: "", what: BI(), desc: BI() }) };
+const LONG = new Set(["lead", "summary", "problem", "paragraphs", "desc", "headline", "role"]);
+const SECTION_ORDER = ["profile", "highlights", "about", "projects", "skills", "timeline"];
+const isBi = v => v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length && Object.keys(v).every(k => k === "ko" || k === "en") && Object.values(v).every(x => typeof x === "string");
+const isImg = v => v && typeof v === "object" && !Array.isArray(v) && "src" in v;
+function blank(v) { if (Array.isArray(v)) return []; if (v && typeof v === "object") { const o = {}; for (const k in v) o[k] = blank(v[k]); return o; } return typeof v === "boolean" ? false : typeof v === "number" ? 0 : ""; }
+const label = k => LABELS[k] || k;
+const text1 = v => isBi(v) ? (v.ko || v.en) : typeof v === "string" ? v : "";
+let typingTimer = null, typingOpen = false;
+function contentChanged(structural) {
+  if (structural) { pushUndo(); typingOpen = false; }
+  else if (!typingOpen) { pushUndo(); typingOpen = true; }
+  clearTimeout(typingTimer); typingTimer = setTimeout(() => { typingOpen = false; }, 1200);
+  updateButtons(); sendDraft({ html: false, reload: true });
+}
+function inputFor(obj, key, long) {
+  const v = obj[key];
+  const f = long || String(v).length > 70 ? el("textarea", { rows: 3 }) : el("input", { type: key === "href" ? "url" : "text" });
+  f.value = v;
+  f.addEventListener("input", () => { obj[key] = f.value; contentChanged(false); });
+  return f;
+}
+function biField(obj, key, long) {
+  const box = el("div", { class: "bi" });
+  for (const lang of ["ko", "en"]) { if (!(lang in obj[key])) obj[key][lang] = ""; box.append(el("div", {}, el("span", { class: "lang", text: lang === "ko" ? "한국어" : "English" }), inputFor(obj[key], lang, long))); }
+  return box;
+}
+function imgField(obj, key) {
+  const img = obj[key];
+  const thumb = img.src ? el("img", { class: "thumb", src: BASE + "/preview/" + img.src, alt: "" }) : el("div", { class: "thumb", text: "이미지 없음" });
+  const file = el("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true });
+  file.addEventListener("change", async () => {
+    const fl = file.files[0]; if (!fl) return;
+    if (fl.size > 3 * 1024 * 1024) return toast("3MB 이하 이미지만 올릴 수 있습니다");
+    const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.readAsDataURL(fl); });
+    try { const r = await api("/api/upload", { name: fl.name, data: b64 }); pushUndo(); img.src = r.path; updateButtons(); renderContent(); sendDraft({ html: false, reload: true }); toast("이미지를 넣었습니다"); }
+    catch (e) { toast(e.message); }
+  });
+  const right = el("div", {}, el("div", { class: "check" },
+      el("button", { class: "btn small", type: "button", onclick: () => file.click(), text: img.src ? "이미지 바꾸기" : "이미지 올리기" }),
+      img.src ? el("button", { class: "btn small danger", type: "button", text: "빼기", onclick: () => { img.src = ""; contentChanged(true); renderContent(); } }) : null, file),
+    img.src ? el("div", { class: "muted", style: "font-size:12px;margin-top:4px", text: img.src }) : null);
+  if (img.alt !== undefined) right.append(el("div", { class: "field" }, el("label", { text: "대체 텍스트 (화면 낭독기용)" }), isBi(img.alt) ? biField(img, "alt") : inputFor(img, "alt")));
+  return el("div", { class: "img-field" }, thumb, right);
+}
+function strList(arr, parentKey) {
+  const box = el("div", { class: "strlist" });
+  arr.forEach((s, i) => { const inp = el("input", { type: "text" }); inp.value = s; inp.addEventListener("input", () => { arr[i] = inp.value; contentChanged(false); });
+    box.append(el("div", { class: "srow" }, inp, el("button", { class: "icon", type: "button", title: "삭제", text: "✕", onclick: () => { arr.splice(i, 1); contentChanged(true); renderContent(); } }))); });
+  box.append(el("button", { class: "btn small", type: "button", text: "+ " + label(parentKey) + " 추가", onclick: () => { arr.push(""); contentChanged(true); renderContent(); } }));
+  return box;
+}
+function summaryOf(item) { if (isBi(item)) return text1(item); for (const k of ["title", "group", "what", "num", "value", "k", "label", "href"]) if (item && item[k]) { const s = text1(item[k]); if (s) return s.replace(/<[^>]+>/g, ""); } return ""; }
+function objList(arr, key) {
+  const box = el("div");
+  arr.forEach((item, i) => {
+    const mv = (d) => { const j = i + d; [arr[i], arr[j]] = [arr[j], arr[i]]; contentChanged(true); renderContent(); };
+    const head = el("div", { class: "item-head" }, el("span", { class: "title", text: `${i + 1}. ${summaryOf(item) || "(비어 있음)"}` }),
+      el("button", { class: "icon", type: "button", title: "위로", text: "↑", disabled: i === 0, onclick: () => mv(-1) }),
+      el("button", { class: "icon", type: "button", title: "아래로", text: "↓", disabled: i === arr.length - 1, onclick: () => mv(1) }),
+      el("button", { class: "icon", type: "button", title: "복제", text: "⧉", onclick: () => { arr.splice(i + 1, 0, clone(item)); contentChanged(true); renderContent(); } }),
+      el("button", { class: "icon", type: "button", title: "삭제", text: "✕", onclick: () => { if (confirm("이 항목을 삭제할까요? (↶ 로 되돌릴 수 있습니다)")) { arr.splice(i, 1); contentChanged(true); renderContent(); } } }));
+    const it = el("div", { class: "item" + (arr.length > 3 ? " collapsed" : "") }, head);
+    head.querySelector(".title").addEventListener("click", () => it.classList.toggle("collapsed"));
+    it.append(el("div", { class: "item-body" }, isBi(item) ? biField(arr, i, LONG.has(key)) : fields(item, key)));
+    box.append(it);
+  });
+  const tpl = TEMPLATES[key] ? TEMPLATES[key]() : (arr.length ? blank(arr[0]) : BI());
+  box.append(el("button", { class: "btn small", type: "button", text: "+ " + label(key) + " 추가", onclick: () => { arr.push(tpl); contentChanged(true); renderContent(); } }));
+  return box;
+}
+function fields(obj) {
+  const frag = document.createDocumentFragment();
+  for (const key of Object.keys(obj)) {
+    const v = obj[key]; let control;
+    if (isImg(v)) control = imgField(obj, key);
+    else if (isBi(v)) control = biField(obj, key, LONG.has(key));
+    else if (typeof v === "boolean") { const c = el("input", { type: "checkbox" }); c.checked = v; c.addEventListener("change", () => { obj[key] = c.checked; contentChanged(true); }); frag.append(el("div", { class: "field" }, el("label", { class: "check" }, c, label(key)))); continue; }
+    else if (typeof v === "string") control = inputFor(obj, key, LONG.has(key));
+    else if (Array.isArray(v)) control = (v.length && typeof v[0] === "string") || (!v.length && (key === "tags" || key === "items")) ? strList(v, key) : objList(v, key);
+    else if (v && typeof v === "object") control = el("div", { class: "item" }, el("div", { class: "item-body" }, fields(v)));
+    else continue;
+    frag.append(el("div", { class: "field" }, el("span", { class: "label", text: label(key) }), control));
+  }
+  return frag;
+}
+function renderContent() {
+  const pane = $("#pane-content");
+  const open = new Set([...pane.querySelectorAll("details.sec[open]")].map(d => d.dataset.key));
+  const scroll = pane.scrollTop; pane.innerHTML = "";
+  if (!S.contentAvailable) { pane.append(el("p", { class: "muted", text: "이 사이트에는 데이터 파일(content.js)이 없습니다. 디자인 탭에서 글자를 두 번 클릭해 바로 고치거나, 파일 탭을 쓰세요." })); return; }
+  const keys = [...SECTION_ORDER.filter(k => k in S.data), ...Object.keys(S.data).filter(k => !SECTION_ORDER.includes(k))];
+  for (const key of keys) {
+    const v = S.data[key];
+    const count = Array.isArray(v) ? `${v.length}개${v.length ? "" : " · 비어 있으면 숨김"}` : "";
+    pane.append(el("details", { class: "sec", "data-key": key, open: open.size ? open.has(key) : key === "profile" },
+      el("summary", {}, el("span", { text: label(key) }), el("span", { class: "count", text: count })),
+      el("div", { class: "sec-body" }, Array.isArray(v) ? (v.length && typeof v[0] === "string" ? strList(v, key) : objList(v, key)) : (v && typeof v === "object" ? fields(v) : inputFor(S.data, key)))));
+  }
+  pane.scrollTop = scroll;
+}
+
+// ---------- device, pages, tabs ----------
+function setDevice(mobile) { $("#frameWrap").classList.toggle("mobile", mobile); $("#pvMobile").classList.toggle("on", mobile); $("#pvDesktop").classList.toggle("on", !mobile); setTimeout(() => bridge() && bridge().refreshInfo(), 200); }
+$("#pvMobile").onclick = () => setDevice(true);
+$("#pvDesktop").onclick = () => setDevice(false);
+$("#pvReload").onclick = () => reloadFrame();
+$("#pageSel").onchange = async e => {
+  if (S.html.length && !confirm("이 페이지의 저장하지 않은 글자·순서 변경을 버리고 다른 페이지로 갈까요? (디자인·내용 변경은 유지)")) { e.target.value = page; return; }
+  S.html = []; await api("/api/draft", { data: "keep", html: { page, edits: [] } }).catch(() => {});
+  page = e.target.value; sel = null; renderDesign(); updateButtons(); reloadFrame(null);
+};
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
+  document.querySelectorAll(".pane").forEach(p => p.hidden = p.id !== "pane-" + t.dataset.tab);
+  if (t.dataset.tab === "files") loadFiles();
+  if (t.dataset.tab === "history") loadHistory();
+});
+
+// ---------- load / save ----------
+async function loadAll(keepPage) {
+  const [c, st, pg] = await Promise.all([api("/api/content"), api("/api/styles"), api("/api/pages")]);
+  S.contentAvailable = c.available; S.data = c.available ? c.data : null; S.name = c.name || "SITE";
+  S.rules = st.rules; S.html = [];
+  saved = { data: clone(S.data), rules: clone(S.rules) };
+  undo = []; redo = [];
+  const ps = $("#pageSel"); ps.innerHTML = "";
+  pg.pages.forEach(p => ps.append(el("option", { value: p, text: p })));
+  if (!keepPage || !pg.pages.includes(page)) page = pg.pages[0] || "index.html";
+  ps.value = page;
+  await api("/api/draft", { data: null, html: { page, edits: [] } });
+  renderContent(); renderDesign(); updateButtons(); reloadFrame();
+}
+function saveBody() { return { data: S.contentAvailable ? S.data : null, name: S.name, rules: S.rules, page, html_edits: S.html }; }
+async function save(auto) {
+  if (!isDirty() || saving || jumping) return;
+  if (editingText) return auto ? scheduleAutosave() : toast("글자 편집을 먼저 끝내세요 (완료 또는 Ctrl+Enter)");
+  const body = clone(saveBody()), before = snapshot(), savedBefore = clone(saved), hadHtml = S.html.length > 0;
+  saving = true; updateButtons();
+  try {
+    const res = await api("/api/save", Object.assign({ auto: !!auto }, body));
+    saving = false;
+    // edits made while the request was in flight stay pending (they are newer than `body`)
+    if (snapshot() === before) S.html = [];
+    else S.html = S.html.slice(body.html_edits.length);
+    if (res.saved.length) undo.push({ kind: "save", body, res, before, savedBefore });
+    redo = [];
+    saved = { data: clone(body.data), rules: clone(body.rules) };
+    lastSavedAt = Date.now(); autosaveArmed = isDirty();
+    updateButtons();
+    if (!auto) toast(res.saved.length ? `저장했습니다: ${res.saved.join(", ")} (아직 공개 전)` : "바뀐 파일이 없습니다");
+    if (hadHtml) reloadFrame();     // element numbers changed with the HTML file
+    if (!$("#pane-history").hidden) loadHistory();
+  } catch (e) { saving = false; updateButtons(); toast("저장 실패: " + e.message); }
+}
+$("#saveBtn").onclick = () => save(false);
+$("#revertBtn").onclick = async () => { if (confirm("저장하지 않은 변경을 모두 버릴까요?")) await loadAll(true); };
+document.addEventListener("keydown", e => {
+  const mod = e.ctrlKey || e.metaKey, typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); if (!$("#pane-files").hidden && !$("#fileEditor").hidden) $("#fileSave").click(); else save(false); }
+  if (mod && !typing && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
+  if (mod && !typing && e.key.toLowerCase() === "y") { e.preventDefault(); doRedo(); }
+});
+window.addEventListener("beforeunload", e => { if (isDirty() || saving) { e.preventDefault(); e.returnValue = ""; } });
+
+// ---------- file menu ----------
+const menuList = $("#fileMenuList");
+function menu(open) { menuList.hidden = !open; $("#fileMenuBtn").setAttribute("aria-expanded", open); }
+$("#fileMenuBtn").onclick = e => { e.stopPropagation(); menu(menuList.hidden); };
+document.addEventListener("click", e => { if (!e.target.closest("#fileMenu")) menu(false); });
+$("#autoSave").checked = autoSaveOn;
+$("#autoSave").onchange = e => { autoSaveOn = e.target.checked; try { localStorage.setItem(AUTO_KEY, autoSaveOn ? "1" : "0"); } catch (x) {} updateButtons(); };
+function showTab(name) { document.querySelector(`.tab[data-tab="${name}"]`).click(); }
+menuList.addEventListener("click", async e => {
+  const b = e.target.closest("[data-m]"); if (!b) return;
+  menu(false);
+  const m = b.dataset.m;
+  if (m === "home") location.href = "/";
+  if (m === "save") save(false);
+  if (m === "history") showTab("history");
+  if (m === "deploy") openDeploy();
+  if (m === "targets") manageTargets();
+  if (m === "export") { if (isDirty()) await save(false); location.href = BASE + "/export.zip"; }
+  if (m === "reveal") homeApi("/api/projects/reveal", { id: PID }).catch(x => toast(x.message));
+  if (m === "rename") {
+    const name = prompt("새 이름", $("#projName").textContent); if (!name) return;
+    try { const r = await homeApi("/api/projects/rename", { id: PID, name }); $("#projName").textContent = r.name; document.title = "사이트 편집기 · " + r.name; toast("이름을 바꿨습니다 (폴더와 배포 설정은 그대로)"); } catch (x) { toast(x.message); }
+  }
+  if (m === "saveas") {
+    const name = prompt("새 프로젝트 이름 (지금 내용을 복사해 새 프로젝트로 만듭니다)", $("#projName").textContent + " 사본"); if (!name) return;
+    if (isDirty()) await save(false);
+    try { const r = await homeApi("/api/projects/duplicate", { id: PID, name }); location.href = "/p/" + r.id + "/"; } catch (x) { toast(x.message); }
+  }
+});
+
+// ---------- dialog helpers ----------
+function openDialog(title) { $("#dlgTitle").textContent = title; $("#dlgBody").innerHTML = ""; $("#dlgFoot").innerHTML = ""; $("#dlg").showModal(); return [$("#dlgBody"), $("#dlgFoot")]; }
+$("#dlg").addEventListener("click", e => { if (e.target.closest("[data-close]")) $("#dlg").close(); });
+function diffView(text) {
+  const pre = el("pre", { class: "diff" });
+  (text || "(변경 없음)").split("\n").forEach(ln => pre.append(el("span", { class: ln.startsWith("+++") || ln.startsWith("---") ? "" : ln.startsWith("+") ? "add-l" : ln.startsWith("-") ? "del-l" : ln.startsWith("@@") ? "hunk" : "", text: ln + "\n" })));
+  return pre;
+}
+$("#diffBtn").onclick = async () => {
+  const [body, foot] = openDialog("저장하면 바뀌는 코드");
+  try {
+    const r = await api("/api/preview-diff", saveBody());
+    body.append(el("p", {}, "바뀌는 파일: ", r.files.length ? r.files.map(f => el("code", { text: f + " " })) : "없음"));
+    (r.warnings || []).forEach(w => body.append(el("div", { class: "banner warn", text: w })));
+    body.append(diffView(r.diff));
+  } catch (e) { body.append(el("div", { class: "banner bad", text: e.message })); }
+  foot.append(el("button", { class: "btn", "data-close": "", text: "닫기" }), el("button", { class: "btn primary", text: "저장", onclick: async () => { $("#dlg").close(); await save(false); } }));
+};
+
+// ---------- files & history ----------
+let currentFile = null;
+async function loadFiles() {
+  const r = await api("/api/files"); const list = $("#fileList"); list.innerHTML = "";
+  r.files.forEach(f => list.append(el("button", { type: "button", class: f === currentFile ? "on" : "", text: f, onclick: () => openFile(f) })));
+}
+async function openFile(path) { const r = await api("/api/file?path=" + encodeURIComponent(path)); currentFile = path; $("#fileLabel").textContent = path; $("#fileText").value = r.text; $("#fileEditor").hidden = false; loadFiles(); }
+$("#fileSave").onclick = async () => {
+  if (isDirty() && !confirm("디자인·내용에 저장하지 않은 변경이 있습니다. 파일을 저장하면 화면이 새로 읽혀 그 변경은 사라집니다. 계속할까요?")) return;
+  try { await api("/api/file", { path: currentFile, text: $("#fileText").value }); toast("파일을 저장했습니다"); await loadAll(true); loadHistory(); } catch (e) { toast("저장 실패: " + e.message); }
+};
+$("#fileDiscard").onclick = async () => { if (!confirm(currentFile + " 을(를) 마지막 배포 상태로 되돌릴까요? (지금 상태는 기록에 남습니다)")) return;
+  try { await api("/api/discard", { path: currentFile }); toast("되돌렸습니다"); openFile(currentFile); await loadAll(true); } catch (e) { toast(e.message); } };
+async function loadHistory() {
+  const r = await api("/api/history"); const box = $("#histList"); box.innerHTML = "";
+  if (!r.items.length) box.append(el("p", { class: "muted", text: "아직 기록이 없습니다." }));
+  r.items.forEach(h => box.append(el("div", { class: "hist" },
+    el("div", { class: "meta" }, el("strong", { translate: "no", text: h.path }), el("small", { text: `${h.at.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d).*/, "$1-$2-$3 $4:$5:$6")} · ${h.reason}` })),
+    el("button", { class: "btn small", type: "button", text: "이 상태로 복원", onclick: async () => {
+      if (!confirm(h.path + " 을(를) 이 시점으로 복원할까요?")) return;
+      await api("/api/restore", { id: h.id }); toast("복원했습니다"); await loadAll(true); loadHistory(); } }))));
+}
+
+// ---------- targets ----------
+const TYPE_LABEL = { git: "GitHub Pages (git push)", sftp: "SFTP (SSH)", ftp: "FTP / FTPS", folder: "폴더 (로컬·네트워크 드라이브)" };
+async function manageTargets(after) {
+  const [body, foot] = openDialog("배포 대상 (서버) 설정");
+  const r = await api("/api/targets");
+  body.append(el("div", { class: "banner info", text: "접속 정보는 이 PC에만 저장됩니다. 비밀번호는 Windows 자격 증명 관리자(키체인)에 들어가고 이 화면에도 다시 보이지 않습니다. 사이트 저장소에는 아무것도 기록되지 않습니다." }));
+  r.targets.forEach(t => body.append(el("div", { class: "tgt" },
+    el("div", { class: "meta" }, el("strong", { translate: "no", text: t.name }), " ", el("span", { class: "pill", text: TYPE_LABEL[t.type] }),
+      el("small", { text: [t.type === "folder" ? t.folder : t.host ? `${t.user}@${t.host}:${t.port}${t.remote_path}` : "", t.site_url ? "→ " + t.site_url : "", t.has_password ? "비밀번호 저장됨" : ""].filter(Boolean).join("  ·  ") })),
+    el("button", { class: "btn small", text: "접속 시험", onclick: async ev => { ev.target.disabled = true; try { const x = await api("/api/targets/test", { id: t.id }); toast(x.message); } catch (e) { toast("실패: " + e.message); } ev.target.disabled = false; } }),
+    t.type !== "git" ? el("button", { class: "btn small", text: "수정", onclick: () => targetForm(t, after) }) : null,
+    el("button", { class: "btn small danger", text: "삭제", onclick: async () => { if (confirm(t.name + " 설정(과 저장된 비밀번호)을 지울까요?")) { await api("/api/targets/delete", { id: t.id }); manageTargets(after); } } }))));
+  foot.append(el("button", { class: "btn", "data-close": "", text: "닫기" }), el("button", { class: "btn primary", text: "+ 새 배포 대상", onclick: () => targetForm(null, after) }));
+}
+function targetForm(t, after) {
+  const [body, foot] = openDialog(t ? "배포 대상 수정" : "새 배포 대상");
+  const v = Object.assign({ type: "sftp", name: "", site_url: "", host: "", port: "", user: "", remote_path: "/", auth: "key", key_file: "", tls: true, passive: true, folder: "" }, t || {});
+  const typeSel = el("select", { class: "in" }, ["sftp", "ftp", "folder", "git"].map(x => el("option", { value: x, text: TYPE_LABEL[x] })));
+  typeSel.value = v.type; if (t) typeSel.disabled = true;
+  const box = el("div");
+  const inp = (k, label, attrs = {}) => { const i = el("input", Object.assign({ type: "text", value: v[k] ?? "" }, attrs)); i.oninput = () => v[k] = i.type === "checkbox" ? i.checked : i.value; if (attrs.type === "checkbox") { i.checked = !!v[k]; i.onchange = () => v[k] = i.checked; return el("label", { class: "check field" }, i, label); } return el("div", { class: "field" }, el("label", { text: label }), i); };
+  const pw = el("input", { type: "password", autocomplete: "new-password", placeholder: t && t.has_password ? "저장됨 (바꿀 때만 입력)" : "" });
+  function draw() {
+    v.type = typeSel.value; box.innerHTML = "";
+    box.append(inp("name", "이름 (예: 학교 서버)"), inp("site_url", "공개 주소 (배포 후 확인용, 예: https://example.com/)"));
+    if (v.type === "sftp" || v.type === "ftp") {
+      box.append(el("div", { class: "grid2" }, inp("host", "서버 주소 (호스트)"), inp("port", "포트", { type: "number", placeholder: v.type === "sftp" ? "22" : "21" })),
+        el("div", { class: "grid2" }, inp("user", "사용자 이름"), inp("remote_path", "서버의 사이트 폴더 (예: /var/www/html)")));
+    }
+    if (v.type === "sftp") {
+      const auth = el("select", { class: "in" }, [["key", "키 파일 (권장)"], ["password", "비밀번호"]].map(([a, l]) => el("option", { value: a, text: l })));
+      auth.value = v.auth; auth.onchange = () => { v.auth = auth.value; draw(); };
+      box.append(el("div", { class: "field" }, el("label", { text: "로그인 방법" }), auth));
+      if (v.auth === "key") box.append(inp("key_file", "개인 키 파일 경로 (예: C:/Users/나/.ssh/id_ed25519)"), el("div", { class: "field" }, el("label", { text: "키 암호 (있을 때만)" }), pw));
+      else box.append(el("div", { class: "field" }, el("label", { text: "비밀번호" }), pw));
+      box.append(el("p", { class: "muted", style: "font-size:12px", text: "처음 접속할 때 서버 지문을 자동으로 기억합니다(accept-new). 이 PC의 OpenSSH(sftp)를 씁니다." }));
+    }
+    if (v.type === "ftp") box.append(el("div", { class: "field" }, el("label", { text: "비밀번호" }), pw), inp("tls", "암호화(FTPS) 사용 — 권장", { type: "checkbox" }), inp("passive", "패시브 모드", { type: "checkbox" }));
+    if (v.type === "folder") box.append(inp("folder", "복사할 폴더 (예: Z:/www 또는 D:/backup/site)"));
+    if (v.type === "git") box.append(el("p", { class: "muted", text: "사이트 폴더가 git 저장소이면 자동으로 만들어집니다. 원격(origin)으로 push 합니다." }));
+  }
+  typeSel.onchange = draw; draw();
+  body.append(el("div", { class: "field" }, el("label", { text: "서버 종류" }), typeSel), box);
+  foot.append(el("button", { class: "btn", text: "뒤로", onclick: () => manageTargets(after) }), el("button", { class: "btn primary", text: "저장", onclick: async () => {
+    try { const payload = Object.assign({}, v, { id: t ? t.id : undefined, password: pw.value || undefined }); pw.value = "";
+      await api("/api/targets", payload); toast("저장했습니다. '접속 시험'으로 확인해 보세요"); manageTargets(after); }
+    catch (e) { body.prepend(el("div", { class: "banner bad", text: e.message })); }
+  } }));
+}
+
+// ---------- deploy ----------
+let lastTarget = null;
+async function openDeploy() {
+  const [body, foot] = openDialog("배포 — 공개 사이트에 올리기");
+  let ts; try { ts = (await api("/api/targets")).targets; } catch (e) { body.append(el("div", { class: "banner bad", text: e.message })); return; }
+  if (!ts.length) { body.append(el("p", { text: "아직 배포 대상이 없습니다. 서버를 먼저 등록하세요." })); foot.append(el("button", { class: "btn primary", text: "배포 대상 추가", onclick: () => manageTargets(openDeploy) })); return; }
+  if (!ts.find(t => t.id === lastTarget)) lastTarget = ts[0].id;
+  const tsel = el("select", { class: "in", style: "width:auto" }, ts.map(t => el("option", { value: t.id, text: `${t.name} — ${TYPE_LABEL[t.type]}` })));
+  tsel.value = lastTarget;
+  tsel.onchange = () => { lastTarget = tsel.value; openDeploy(); };
+  body.append(el("div", { class: "row" }, el("span", { class: "label", style: "margin:0", text: "올릴 곳" }), tsel, el("button", { class: "btn small", text: "배포 대상 관리", onclick: () => manageTargets(openDeploy) })));
+  if (isDirty()) body.append(el("div", { class: "banner warn", text: "저장하지 않은 변경이 있습니다. 저장한 것만 배포됩니다." }));
+  const target = ts.find(t => t.id === lastTarget);
+  let r; try { r = await api("/api/review?target=" + encodeURIComponent(lastTarget)); } catch (e) { body.append(el("div", { class: "banner bad", text: "비교 실패: " + e.message })); return; }
+  body.append(el("p", { class: "muted" }, "주소: ", el("strong", { text: r.repo.site_url || target.site_url || "-" }), "   ·   위치: " + (r.repo.remote || "-")));
+  const rollbackBtn = el("button", { class: "btn danger", text: "직전 배포 되돌리기", onclick: () => doRollback(target) });
+  if (!r.files.length) {
+    body.append(el("div", { class: "banner ok", text: "올릴 변경이 없습니다. 공개 사이트가 이미 최신입니다." }));
+    foot.append(target.type === "git" || r.can_rollback ? rollbackBtn : null, el("button", { class: "btn", "data-close": "", text: "닫기" }));
+    return;
+  }
+  if (r.first_deploy) body.append(el("div", { class: "banner info", text: "이 서버에 처음 올립니다. 서버에 같은 이름의 파일이 있으면 먼저 내려받아 백업한 뒤 덮어씁니다." }));
+  if (r.unpushed_commits && r.unpushed_commits.length) body.append(el("div", { class: "banner warn" }, "아직 올라가지 않은 커밋도 함께 올라갑니다: ", r.unpushed_commits.join(" · ")));
+  body.append(el("div", { class: "label", text: `바뀐 파일 ${r.files.length}개` }),
+    el("ul", {}, r.files.slice(0, 200).map(f => el("li", {}, el("code", { text: f.path }), el("span", { class: "muted", text: "  " + ({ added: "새 파일", modified: "수정", deleted: "삭제" }[f.status] || f.status) })))));
+  if (r.diff) body.append(el("div", { class: "label", text: "바뀐 내용 (초록 = 추가, 빨강 = 삭제)" }), diffView(r.diff));
+  if (r.diff_truncated) body.append(el("div", { class: "banner warn", text: "변경이 너무 커서 앞부분만 보여 줍니다." }));
+  const blocked = r.secrets.length > 0;
+  if (blocked) body.append(el("div", { class: "banner bad" }, "비밀값으로 보이는 내용이 있어 배포를 막았습니다: ", r.secrets.map(s => `${s.path} (${s.kind})`).join(", ")));
+  const msg = el("input", { type: "text", placeholder: "무엇을 바꿨는지 한 줄 (예: 제목 글꼴·크기 변경)" });
+  const agree = el("input", { type: "checkbox", id: "agree" });
+  body.append(el("div", { class: "field" }, el("label", { text: "변경 설명" }), msg), el("label", { class: "check", for: "agree" }, agree, "위 변경을 공개 사이트에 올리는 것을 확인했습니다"));
+  const go = el("button", { class: "btn primary", text: "배포하기", disabled: true });
+  agree.onchange = () => go.disabled = blocked || !agree.checked;
+  go.onclick = async () => {
+    go.disabled = true; agree.disabled = true;
+    try { await api("/api/deploy", { target: lastTarget, confirm: true, change_id: r.change_id, message: msg.value }); }
+    catch (e) { body.append(el("div", { class: "banner bad", text: "시작하지 못했습니다: " + e.message })); return; }
+    watchJob(body, foot, "배포");
+  };
+  foot.append(target.type === "git" || r.can_rollback ? rollbackBtn : null, el("button", { class: "btn", "data-close": "", text: "취소" }), go);
+}
+async function doRollback(target) {
+  const what = target.type === "git" ? "마지막 커밋을 되돌리는 커밋을 만들어 push 합니다" : "직전 배포 때 백업한 서버 파일을 다시 올리고, 그때 새로 올린 파일은 지웁니다";
+  if (!confirm(`${target.name}: 직전 배포를 되돌릴까요?\n${what}.`)) return;
+  const [body, foot] = openDialog("직전 배포 되돌리기");
+  try { await api("/api/rollback", { target: target.id, confirm: true }); } catch (e) { body.append(el("div", { class: "banner bad", text: e.message })); foot.append(el("button", { class: "btn", "data-close": "", text: "닫기" })); return; }
+  watchJob(body, foot, "되돌리기");
+}
+function watchJob(body, foot, what) {
+  const log = el("div", { class: "log", translate: "no", text: T(what + " 중…") }); body.append(el("div", { class: "label", text: "진행 상황" }), log); log.scrollIntoView({ block: "end" });
+  foot.innerHTML = "";
+  const poll = async () => {
+    const j = await api("/api/job");
+    log.textContent = (j.log || []).join("\n") || what + " 중…";
+    if (j.state === "running") return setTimeout(poll, 1500);
+    if (j.state === "failed") body.append(el("div", { class: "banner bad", text: "실패: " + j.error }));
+    else if (j.result) {
+      const ok = j.result.ok;
+      body.append(el("div", { class: "banner " + (ok ? "ok" : "warn") }, ok ? `${what} 완료 · 공개 사이트 파일이 올린 내용과 같은 것을 확인했습니다. ` : `${what}은 끝났지만 공개 사이트가 아직 다릅니다(캐시일 수 있음). 잠시 뒤 다시 확인하세요. `,
+        j.result.site_url ? el("a", { href: j.result.site_url, target: "_blank", rel: "noopener", text: "사이트 열기 ↗" }) : null));
+      (j.result.verified || []).forEach(v => body.append(el("div", { class: "muted", style: "font-size:12px", text: `${v.match ? "✓" : "✗"} ${v.url}` })));
+    }
+    foot.append(el("button", { class: "btn", "data-close": "", text: "닫기" }));
+    loadHistory();
+  };
+  poll();
+}
+$("#deployBtn").onclick = openDeploy;
+
+loadAll().catch(e => { $("#status").textContent = "불러오기 실패: " + e.message; });
+</script>
+</body>
+</html>
