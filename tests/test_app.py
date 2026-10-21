@@ -63,7 +63,7 @@ class ProjectList(unittest.TestCase):
         p = projects.create("Demo")
         self.assertTrue(p["managed"])
         self.assertTrue((Path(p["path"]) / "index.html").exists())
-        self.assertEqual(Path(p["path"]).parent, self.store)
+        self.assertEqual(Path(p["path"]).parent.resolve(), self.store.resolve())  # Windows may hand out short (8.3) temp paths
         c = projects.duplicate(p["id"])
         self.assertNotEqual(c["path"], p["path"])
         with self.assertRaises(projects.ProjectError):
